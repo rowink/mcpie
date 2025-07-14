@@ -155,6 +155,32 @@ const TOOLS: ToolHandler[] = [
             }
         }
     },
+    // ReadPo Markdown 海报
+    {
+        tool: {
+            name: "readpoPoster",
+            description: "将传入的 Markdown 内容渲染为海报图片，返回图片直链（使用 https://readpo.com/p/Markdown内容 作为图片链接）。",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    markdown: {
+                        type: "string",
+                        description: "要渲染为海报的 Markdown 内容"
+                    }
+                },
+                required: ["markdown"]
+            }
+        },
+        handler: async (args: Record<string, unknown>): Promise<CallToolResult> => {
+            const markdown = args.markdown as string;
+            if (typeof markdown !== "string" || markdown.trim() === "") {
+                return createTextResponse("请提供要渲染为海报的 Markdown 内容", true);
+            }
+            // 直接拼接链接，encodeURIComponent 以防止内容包含特殊字符
+            const imageUrl = `https://readpo.com/p/${encodeURIComponent(markdown)}`;
+            return createImageResponse(imageUrl);
+        }
+    },
 ];
 
 // ==================== 服务器配置 ====================
