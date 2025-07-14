@@ -178,7 +178,7 @@ const TOOLS: ToolHandler[] = [
             }
             // 直接拼接链接，encodeURIComponent 以防止内容包含特殊字符
             const imageUrl = `https://readpo.com/p/${encodeURIComponent(markdown)}`;
-            return createImageResponse(imageUrl);
+            return createTextResponse(imageUrl);
         }
     },
 ];
