@@ -90,103 +90,69 @@ class ToolRegistry {
  * 可用工具集合
  */
 const TOOLS: ToolHandler[] = [
-    // 日期时间格式化
+    // 网页元标签信息获取
     {
         tool: {
-            name: "formatDateTime",
-            description: "格式化日期时间",
+            name: "fetchMetaTags",
+            description: "获取指定网页的元标签(meta)信息，如标题、描述、favicon、OpenGraph、Twitter等。",
             inputSchema: {
                 type: "object",
                 properties: {
-                    format: {
+                    url: {
                         type: "string",
-                        description: "格式字符串，例如 'YYYY-MM-DD HH:mm:ss'。支持的标记: YYYY(年), MM(月), DD(日), HH(时), mm(分), ss(秒)"
+                        description: "要提取元信息的网址（完整URL），如 https://example.com"
                     },
-                    timestamp: {
-                        type: "number",
-                        description: "可选的时间戳（毫秒）。默认为当前时间"
-                    },
+                    meta: {
+                        type: "array",
+                        items: {
+                            type: "string"
+                        },
+                        description: "（可选）要获取的特定元标签名数组，如 [\"language\",\"charset\",\"viewport\",\"title\",\"description\",\"keywords\",\"favicon\",\"author\",\"generator\",\"theme\",\"canonical\",\"ogUrl\",\"ogTitle\",\"ogSiteName\",\"ogDescription\",\"ogImage\",\"ogImageAlt\",\"ogType\",\"twitterSite\",\"twitterCard\",\"twitterTitle\",\"twitterCreator\",\"twitterDescription\",\"twitterImage\",\"robots\",\"icons]，不填则返回所有支持的元标签"
+                    }
                 },
-                required: ["format"],
-            },
+                required: ["url"]
+            }
         },
         handler: async (args: Record<string, unknown>): Promise<CallToolResult> => {
-            const format = args.format as string;
-            const timestamp = args.timestamp as number || Date.now();
+            const url = args.url as string;
+            const meta = Array.isArray(args.meta) ? (args.meta as string[]) : undefined;
+
+            if (typeof url !== "string" || !/^https?:\/\/.+/i.test(url)) {
+                return createTextResponse("请提供有效的网址（必须以 http:// 或 https:// 开头）", true);
+            }
 
             try {
-                const date = new Date(timestamp);
-
-                if (isNaN(date.getTime())) {
-                    return createTextResponse(`无效的时间戳: ${timestamp}`, true);
+                const params = new URLSearchParams({ url });
+                if (meta && meta.length > 0) {
+                    params.set("meta", meta.join(","));
                 }
 
-                const formatMap: Record<string, string> = {
-                    'YYYY': date.getFullYear().toString(),
-                    'MM': (date.getMonth() + 1).toString().padStart(2, '0'),
-                    'DD': date.getDate().toString().padStart(2, '0'),
-                    'HH': date.getHours().toString().padStart(2, '0'),
-                    'mm': date.getMinutes().toString().padStart(2, '0'),
-                    'ss': date.getSeconds().toString().padStart(2, '0'),
-                };
+                const apiUrl = `https://meta-thief.itea.dev/api/meta?${params.toString()}`;
 
-                let result = format;
-                for (const [token, value] of Object.entries(formatMap)) {
-                    result = result.replace(new RegExp(token, 'g'), value);
+                const response = await fetch(apiUrl, {
+                    method: "GET"
+                });
+
+                if (!response.ok) {
+                    return createTextResponse(`MetaThief API 请求失败，状态码: ${response.status}`, true);
                 }
 
-                return createTextResponse(result);
+                const data = await response.json();
+
+                if ("error" in data) {
+                    return createTextResponse(
+                        `MetaThief API 错误: ${data.error || ""}${data.message ? " - " + data.message : ""}`,
+                        true
+                    );
+                }
+
+                return createTextResponse(JSON.stringify(data, null, 2));
             } catch (error) {
-                return createTextResponse(`日期格式化错误: ${error instanceof Error ? error.message : String(error)}`, true);
+                return createTextResponse(
+                    `获取网页元标签信息时发生错误: ${error instanceof Error ? error.message : String(error)}`,
+                    true
+                );
             }
-        }
-    },
-
-    // 文本统计
-    {
-        tool: {
-            name: "textStats",
-            description: "分析文本并返回统计信息",
-            inputSchema: {
-                type: "object",
-                properties: {
-                    text: { type: "string", description: "要分析的文本" },
-                },
-                required: ["text"],
-            },
-        },
-        handler: async (args: Record<string, unknown>): Promise<CallToolResult> => {
-            const text = args.text as string;
-
-            if (typeof text !== "string") {
-                return createTextResponse(`输入应为字符串，但收到了 ${typeof text}`, true);
-            }
-
-            const charCount = text.length;
-            const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
-            const lineCount = text.split(/\r\n|\r|\n/).length;
-
-            // 计算字符频率
-            const charFrequency: Record<string, number> = {};
-            for (const char of text) {
-                charFrequency[char] = (charFrequency[char] || 0) + 1;
-            }
-
-            // 获取前10个最常见字符
-            const topChars = Object.entries(charFrequency)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 10)
-                .map(([char, count]) => `"${char === ' ' ? '空格' : char === '\n' ? '换行' : char === '\t' ? '制表符' : char}": ${count}`)
-                .join(', ');
-
-            const result = {
-                字符数: charCount,
-                单词数: wordCount,
-                行数: lineCount,
-                常见字符: topChars
-            };
-
-            return createTextResponse(JSON.stringify(result, null, 2));
         }
     },
 ];
