@@ -273,7 +273,7 @@ async function main() {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>MCPie - 强大的 MCP 工具服务器</title>
-        <link rel="icon" href="/static/favicon.ico">
+        <link rel="icon" href="/static/favicon.png">
         <style>
             * {
             margin: 0;
