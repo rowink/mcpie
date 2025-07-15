@@ -201,7 +201,7 @@ function createServer(): { server: Server; cleanup: () => Promise<void> } {
     // 创建服务器
     const server = new Server(
         {
-            name: "工具服务器",
+            name: "MCPie工具服务器",
             version: "1.0.0",
             description: "模块化工具服务器，提供各种实用工具功能"
         },
@@ -242,6 +242,8 @@ function createServer(): { server: Server; cleanup: () => Promise<void> } {
 async function main() {
     const { server, cleanup } = createServer();
     const app = express();
+    app.use('/static', express.static('public'));
+
     const activeTransports = new Map();
     let transport: SSEServerTransport;
 
@@ -271,6 +273,7 @@ async function main() {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>MCPie - 强大的 MCP 工具服务器</title>
+        <link rel="icon" href="/static/favicon.ico">
         <style>
             * {
             margin: 0;
