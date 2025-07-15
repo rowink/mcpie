@@ -10,6 +10,7 @@ import {
 import express from "npm:express";
 import { v4 as uuidv4 } from "npm:uuid";
 import { exit } from "node:process";
+import path from 'node:path';
 
 // ==================== 类型定义 ====================
 
@@ -247,6 +248,10 @@ async function main() {
     const activeTransports = new Map();
     let transport: SSEServerTransport;
 
+    app.get('/favicon.ico', (req, res) => {
+        res.sendFile(path.join(__dirname, 'public', 'favicon.ico'));
+    });
+
     // 添加根路由，返回使用说明页面
     app.get("/", (req, res) => {
         // 获取主机信息，如果没有则默认使用 localhost
@@ -273,7 +278,7 @@ async function main() {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>MCPie - 强大的 MCP 工具服务器</title>
-        <link rel="icon" href="/static/favicon.png">
+        <link rel="icon" href="/favicon.ico">
         <style>
             * {
             margin: 0;
