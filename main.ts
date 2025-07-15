@@ -8,7 +8,8 @@ import {
     Tool,
 } from "npm:@modelcontextprotocol/sdk/types.js";
 import express from "npm:express";
-import { v4 as uuidv4 } from "npm:uuid"; 
+import { v4 as uuidv4 } from "npm:uuid";
+import { exit } from "node:process";
 
 // ==================== 类型定义 ====================
 
@@ -752,16 +753,66 @@ async function main() {
 
     app.get("/sse", async (req, res) => {
         const connectionId = uuidv4();
-        transport = new SSEServerTransport(`/message/${connectionId}`, res);
-        await server.connect(transport);
-         activeTransports.set(connectionId, transport);
 
-        server.onclose = async () => {
+        // 设置连接超时
+        const connectionTimeout = setTimeout(() => {
+            console.log(`连接超时: ${connectionId}`);
             activeTransports.delete(connectionId);
-            await cleanup();
-            await server.close();
-            process.exit(0);
-        };
+            if (!res.headersSent) {
+                res.status(408).send("Connection timeout");
+            }
+        }, 30000);
+
+        try {
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
+
+            const transport = new SSEServerTransport(`/message/${connectionId}`, res);
+
+            // 先存储 transport，再连接
+            activeTransports.set(connectionId, transport);
+
+            // 添加连接状态标记
+            transport.connectionId = connectionId;
+            transport.isConnected = false;
+
+            await server.connect(transport);
+
+            // 标记连接成功
+            transport.isConnected = true;
+            clearTimeout(connectionTimeout);
+
+            // 设置关闭处理
+            transport.onclose = async () => {
+                console.log(`连接关闭: ${connectionId}`);
+                activeTransports.delete(connectionId);
+                clearTimeout(connectionTimeout);
+            };
+
+            // 处理响应关闭
+            res.on('close', () => {
+                console.log(`响应关闭: ${connectionId}`);
+                activeTransports.delete(connectionId);
+                clearTimeout(connectionTimeout);
+            });
+
+            // 处理响应错误
+            res.on('error', (error) => {
+                console.error(`响应错误 ${connectionId}:`, error);
+                activeTransports.delete(connectionId);
+                clearTimeout(connectionTimeout);
+            });
+
+        } catch (error) {
+            console.error("SSE 连接错误:", error);
+            activeTransports.delete(connectionId);
+            clearTimeout(connectionTimeout);
+            if (!res.headersSent) {
+                res.status(500).send("Connection failed");
+            }
+        }
     });
 
     app.post("/message/:connectionId", async (req, res) => {
@@ -769,13 +820,40 @@ async function main() {
         const transport = activeTransports.get(connectionId);
 
         if (!transport) {
-            return res.status(404).send("Connection not found");
+            return res.status(404).json({
+                error: "Connection not found",
+                connectionId,
+                activeConnections: Array.from(activeTransports.keys())
+            });
         }
+
+        // 检查连接是否已经建立
+        if (!transport.isConnected) {
+            return res.status(425).json({
+                error: "Connection not ready",
+                connectionId
+            });
+        }
+
         try {
+            // 添加请求处理超时
+            const requestTimeout = setTimeout(() => {
+                console.log(`请求处理超时: ${connectionId}`);
+                if (!res.headersSent) {
+                    res.status(408).json({ error: "Request timeout" });
+                }
+            }, 10000);
+
             await transport.handlePostMessage(req, res);
+            clearTimeout(requestTimeout);
+
         } catch (error) {
-            console.error("Error handling message:", error);
-            res.status(500).send("Internal server error");
+            if (!res.headersSent) {
+                res.status(500).json({
+                    error: "Internal server error",
+                    message: error.message
+                });
+            }
         }
     });
 
