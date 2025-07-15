@@ -8,6 +8,7 @@ import {
     Tool,
 } from "npm:@modelcontextprotocol/sdk/types.js";
 import express from "npm:express";
+import { v4 as uuidv4 } from "npm:uuid"; 
 
 // ==================== 类型定义 ====================
 
@@ -240,6 +241,7 @@ function createServer(): { server: Server; cleanup: () => Promise<void> } {
 async function main() {
     const { server, cleanup } = createServer();
     const app = express();
+    const activeTransports = new Map();
     let transport: SSEServerTransport;
 
     // 添加根路由，返回使用说明页面
@@ -749,18 +751,32 @@ async function main() {
     });
 
     app.get("/sse", async (req, res) => {
-        transport = new SSEServerTransport("/message", res);
+        const connectionId = uuidv4();
+        transport = new SSEServerTransport(`/message/${connectionId}`, res);
         await server.connect(transport);
+         activeTransports.set(connectionId, transport);
 
         server.onclose = async () => {
+            activeTransports.delete(connectionId);
             await cleanup();
             await server.close();
             process.exit(0);
         };
     });
 
-    app.post("/message", async (req, res) => {
-        await transport.handlePostMessage(req, res);
+    app.post("/message/:connectionId", async (req, res) => {
+        const connectionId = req.params.connectionId;
+        const transport = activeTransports.get(connectionId);
+
+        if (!transport) {
+            return res.status(404).send("Connection not found");
+        }
+        try {
+            await transport.handlePostMessage(req, res);
+        } catch (error) {
+            console.error("Error handling message:", error);
+            res.status(500).send("Internal server error");
+        }
     });
 
     const PORT = Deno.env.get("PORT") || 3001;
