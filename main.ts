@@ -10,7 +10,8 @@ import {
 import express from "npm:express";
 import { v4 as uuidv4 } from "npm:uuid";
 import { exit } from "node:process";
-import path from 'node:path';
+import path from "node:path";
+import { dirname, fromFileUrl, join } from "https://deno.land/std@0.224.0/path/mod.ts";
 
 // ==================== 类型定义 ====================
 
@@ -66,16 +67,13 @@ class ToolRegistry {
      * 获取所有已注册工具的定义
      */
     getTools(): Tool[] {
-        return Array.from(this.tools.values()).map(th => th.tool);
+        return Array.from(this.tools.values()).map((th) => th.tool);
     }
 
     /**
      * 处理工具调用请求
      */
-    async handleToolCall(
-        name: string,
-        args: Record<string, unknown>
-    ): Promise<CallToolResult> {
+    async handleToolCall(name: string, args: Record<string, unknown>): Promise<CallToolResult> {
         const toolHandler = this.tools.get(name);
         if (!toolHandler) return createTextResponse(`未知工具: ${name}`, true);
 
@@ -103,18 +101,19 @@ const TOOLS: ToolHandler[] = [
                 properties: {
                     url: {
                         type: "string",
-                        description: "要提取元信息的网址（完整URL），如 https://example.com"
+                        description: "要提取元信息的网址（完整URL），如 https://example.com",
                     },
                     meta: {
                         type: "array",
                         items: {
-                            type: "string"
+                            type: "string",
                         },
-                        description: "（可选）要获取的特定元标签名数组，如 [\"language\",\"charset\",\"viewport\",\"title\",\"description\",\"keywords\",\"favicon\",\"author\",\"generator\",\"theme\",\"canonical\",\"ogUrl\",\"ogTitle\",\"ogSiteName\",\"ogDescription\",\"ogImage\",\"ogImageAlt\",\"ogType\",\"twitterSite\",\"twitterCard\",\"twitterTitle\",\"twitterCreator\",\"twitterDescription\",\"twitterImage\",\"robots\",\"icons]，不填则返回所有支持的元标签"
-                    }
+                        description:
+                            '（可选）要获取的特定元标签名数组，如 ["language","charset","viewport","title","description","keywords","favicon","author","generator","theme","canonical","ogUrl","ogTitle","ogSiteName","ogDescription","ogImage","ogImageAlt","ogType","twitterSite","twitterCard","twitterTitle","twitterCreator","twitterDescription","twitterImage","robots","icons]，不填则返回所有支持的元标签',
+                    },
                 },
-                required: ["url"]
-            }
+                required: ["url"],
+            },
         },
         handler: async (args: Record<string, unknown>): Promise<CallToolResult> => {
             const url = args.url as string;
@@ -133,7 +132,7 @@ const TOOLS: ToolHandler[] = [
                 const apiUrl = `https://meta-thief.itea.dev/api/meta?${params.toString()}`;
 
                 const response = await fetch(apiUrl, {
-                    method: "GET"
+                    method: "GET",
                 });
 
                 if (!response.ok) {
@@ -156,23 +155,24 @@ const TOOLS: ToolHandler[] = [
                     true
                 );
             }
-        }
+        },
     },
     // ReadPo Markdown 海报
     {
         tool: {
             name: "readpoPoster",
-            description: "将传入的 Markdown 内容渲染为海报图片，返回图片直链（使用 https://readpo.com/p/Markdown内容 作为图片链接）。",
+            description:
+                "将传入的 Markdown 内容渲染为海报图片，返回图片直链（使用 https://readpo.com/p/Markdown内容 作为图片链接）。",
             inputSchema: {
                 type: "object",
                 properties: {
                     markdown: {
                         type: "string",
-                        description: "要渲染为海报的 Markdown 内容"
-                    }
+                        description: "要渲染为海报的 Markdown 内容",
+                    },
                 },
-                required: ["markdown"]
-            }
+                required: ["markdown"],
+            },
         },
         handler: async (args: Record<string, unknown>): Promise<CallToolResult> => {
             const markdown = args.markdown as string;
@@ -182,7 +182,7 @@ const TOOLS: ToolHandler[] = [
             // 直接拼接链接，encodeURIComponent 以防止内容包含特殊字符
             const imageUrl = `https://readpo.com/p/${encodeURIComponent(markdown)}`;
             return createTextResponse(imageUrl);
-        }
+        },
     },
 ];
 
@@ -204,13 +204,13 @@ function createServer(): { server: Server; cleanup: () => Promise<void> } {
         {
             name: "MCPie工具服务器",
             version: "1.0.0",
-            description: "模块化工具服务器，提供各种实用工具功能"
+            description: "模块化工具服务器，提供各种实用工具功能",
         },
         {
             capabilities: {
                 tools: {
                     list: true,
-                    call: true
+                    call: true,
                 },
             },
         }
@@ -243,24 +243,25 @@ function createServer(): { server: Server; cleanup: () => Promise<void> } {
 async function main() {
     const { server } = createServer();
     const app = express();
-    app.use('/static', express.static('public'));
+    app.use("/static", express.static("public"));
 
     const activeTransports = new Map();
     let transport: SSEServerTransport;
 
-    app.get('/favicon.ico', (req, res) => {
-        res.sendFile(path.join(__dirname, 'public', 'favicon.ico'));
+    app.get("/favicon.ico", (req, res) => {
+        const __dirname = dirname(fromFileUrl(import.meta.url));
+        res.sendFile(join(__dirname, "public", "favicon.ico"));
     });
 
     // 添加根路由，返回使用说明页面
     app.get("/", (req, res) => {
         // 获取主机信息，如果没有则默认使用 localhost
         const host = req.headers.host || `localhost:${PORT}`;
-        const protocol = req.headers['x-forwarded-proto'] || 'https';
+        const protocol = req.headers["x-forwarded-proto"] || "https";
         const baseUrl = `${protocol}://${host}`;
 
         // 从 TOOLS 数组生成工具 HTML
-        const toolsHtml = TOOLS.map(toolHandler => {
+        const toolsHtml = TOOLS.map((toolHandler) => {
             const { name, description } = toolHandler.tool;
 
             return `
@@ -269,7 +270,7 @@ async function main() {
                 <p class="tool-description">${description}</p>
                 </div>
       `;
-        }).join('');
+        }).join("");
 
         const html = `
         <!DOCTYPE html>
@@ -755,7 +756,7 @@ async function main() {
         </html>
     `;
 
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
         res.send(html);
     });
 
@@ -772,10 +773,10 @@ async function main() {
         }, 30000);
 
         try {
-            res.setHeader('Cache-Control', 'no-cache');
-            res.setHeader('Connection', 'keep-alive');
-            res.setHeader('Access-Control-Allow-Origin', '*');
-            res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
+            res.setHeader("Cache-Control", "no-cache");
+            res.setHeader("Connection", "keep-alive");
+            res.setHeader("Access-Control-Allow-Origin", "*");
+            res.setHeader("Access-Control-Allow-Headers", "Cache-Control");
 
             const transport = new SSEServerTransport(`/message/${connectionId}`, res);
 
@@ -800,19 +801,18 @@ async function main() {
             };
 
             // 处理响应关闭
-            res.on('close', () => {
+            res.on("close", () => {
                 console.log(`响应关闭: ${connectionId}`);
                 activeTransports.delete(connectionId);
                 clearTimeout(connectionTimeout);
             });
 
             // 处理响应错误
-            res.on('error', (error) => {
+            res.on("error", (error) => {
                 console.error(`响应错误 ${connectionId}:`, error);
                 activeTransports.delete(connectionId);
                 clearTimeout(connectionTimeout);
             });
-
         } catch (error) {
             console.error("SSE 连接错误:", error);
             activeTransports.delete(connectionId);
@@ -831,7 +831,7 @@ async function main() {
             return res.status(404).json({
                 error: "Connection not found",
                 connectionId,
-                activeConnections: Array.from(activeTransports.keys())
+                activeConnections: Array.from(activeTransports.keys()),
             });
         }
 
@@ -839,7 +839,7 @@ async function main() {
         if (!transport.isConnected) {
             return res.status(425).json({
                 error: "Connection not ready",
-                connectionId
+                connectionId,
             });
         }
 
@@ -854,12 +854,11 @@ async function main() {
 
             await transport.handlePostMessage(req, res);
             clearTimeout(requestTimeout);
-
         } catch (error) {
             if (!res.headersSent) {
                 res.status(500).json({
                     error: "Internal server error",
-                    message: error.message
+                    message: error.message,
                 });
             }
         }
