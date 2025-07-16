@@ -241,7 +241,7 @@ function createServer(): { server: Server; cleanup: () => Promise<void> } {
  * 主程序入口
  */
 async function main() {
-    const { server, cleanup } = createServer();
+    const { server } = createServer();
     const app = express();
     app.use('/static', express.static('public'));
 
