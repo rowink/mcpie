@@ -484,7 +484,7 @@ async function main() {
 
             .endpoint-info {
             background: rgba(227, 242, 253, 0.5);
-            padding: 30px;
+            padding: 15px;
             border-radius: 15px;
             border-left: 4px solid #42a5f5;
             }
