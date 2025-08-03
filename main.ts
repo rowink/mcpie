@@ -253,6 +253,11 @@ async function main() {
         res.sendFile(join(__dirname, "public", "favicon.ico"));
     });
 
+    app.get("/preview.png", (req, res) => {
+        const __dirname = dirname(fromFileUrl(import.meta.url));
+        res.sendFile(join(__dirname, "public", "preview.png"));
+    });
+
     // 添加根路由，返回使用说明页面
     app.get("/", (req, res) => {
         // 获取主机信息，如果没有则默认使用 localhost
